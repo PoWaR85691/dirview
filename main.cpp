@@ -56,6 +56,12 @@
 #include <QTreeView>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QDir>
+#include <QVBoxLayout>
+#include <QLineEdit>
+#include <QDebug>
+#include <QStringList>
+#include <QString>
 
 int main(int argc, char *argv[])
 {
@@ -72,8 +78,9 @@ int main(int argc, char *argv[])
     parser.addOption(dontWatchOption);
     parser.addPositionalArgument("directory", "The directory to start in.");
     parser.process(app);
+    // Default - user home dir
     const QString rootPath = parser.positionalArguments().isEmpty()
-        ? QString() : parser.positionalArguments().first();
+        ? QDir::homePath() : parser.positionalArguments().first();
 
     QFileSystemModel model;
     model.setRootPath("");
@@ -81,6 +88,8 @@ int main(int argc, char *argv[])
         model.setOption(QFileSystemModel::DontUseCustomDirectoryIcons);
     if (parser.isSet(dontWatchOption))
         model.setOption(QFileSystemModel::DontWatchForChanges);
+    model.setFilter(QDir::Dirs | QDir::Files | QDir::Hidden | QDir::NoDot | QDir::NoDotDot); // Show all files and dirs
+    model.setNameFilterDisables(false); // Show only searched
     QTreeView tree;
     tree.setModel(&model);
     if (!rootPath.isEmpty()) {
@@ -100,8 +109,27 @@ int main(int argc, char *argv[])
     // Make it flickable on touchscreens
     QScroller::grabGesture(&tree, QScroller::TouchGesture);
 
-    tree.setWindowTitle(QObject::tr("Dir View"));
-    tree.show();
+    // Main window
+    QWidget main;
+    main.setWindowTitle(QObject::tr("Dir View"));
+    main.resize(availableSize / 2);
+
+    // Search line
+    QLineEdit searchInput;
+    searchInput.setPlaceholderText("Поиск");
+    QObject::connect(&searchInput, &QLineEdit::textChanged, [&searchInput, &model](){
+        if (!searchInput.text().isEmpty())
+            model.setNameFilters(QStringList({ searchInput.text() }));
+       else
+            model.setNameFilters(QStringList({ QString("*") }));
+    });
+
+    // Make layout and show
+    QVBoxLayout mainLayout;
+    mainLayout.addWidget(&searchInput);
+    mainLayout.addWidget(&tree);
+    main.setLayout(&mainLayout);
+    main.show();
 
     return app.exec();
 }
